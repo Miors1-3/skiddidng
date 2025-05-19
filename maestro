@@ -1,0 +1,299 @@
+local plr = game.Players.LocalPlayer
+local uis = game:GetService("UserInputService")
+local mouse = plr:GetMouse()
+local speedEnabled = false
+local flyEnabled = false
+local baseSpeed = 16
+local customSpeed = 100
+local maxSpeed = 500
+local flySpeed = 50
+local maxFlySpeed = 200
+local speedMultiplier = 1
+local humanoid = nil
+local torso = nil
+local ctrl = {f = 0, b = 0, l = 0, r = 0}
+local lastctrl = {f = 0, b = 0, l = 0, r = 0}
+
+-- Initialize character
+local function InitializeCharacter()
+    if plr.Character then
+        humanoid = plr.Character:WaitForChild("Humanoid", 10)
+        torso = plr.Character:WaitForChild("HumanoidRootPart", 10)
+        if humanoid then
+            humanoid.WalkSpeed = baseSpeed
+        end
+    end
+end
+
+-- Update ground speed
+local function UpdateSpeed()
+    if humanoid and speedEnabled then
+        local targetSpeed = math.clamp(customSpeed * speedMultiplier, 16, maxSpeed)
+        for i = humanoid.WalkSpeed, targetSpeed, (targetSpeed > humanoid.WalkSpeed and 1 or -1) do
+            humanoid.WalkSpeed = i
+            wait(0.05)
+        end
+    elseif humanoid then
+        humanoid.WalkSpeed = baseSpeed
+    end
+end
+
+-- Fly logic
+local function Fly()
+    if not torso or not humanoid then return end
+    local bg = Instance.new("BodyGyro", torso)
+    bg.P = 9e4
+    bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bg.CFrame = torso.CFrame
+    local bv = Instance.new("BodyVelocity", torso)
+    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bv.Velocity = Vector3.new(0, 0.1, 0)
+
+    spawn(function()
+        repeat wait()
+            if not flyEnabled then break end
+            humanoid.PlatformStand = true
+            if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
+                flySpeed = flySpeed + 0.5 + (flySpeed / maxFlySpeed)
+                if flySpeed > maxFlySpeed then
+                    flySpeed = maxFlySpeed
+                end
+            elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and flySpeed > 0 then
+                flySpeed = flySpeed - 1
+                if flySpeed < 0 then
+                    flySpeed = 0
+                end
+            end
+            if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
+                bv.Velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) +
+                    ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) -
+                    game.Workspace.CurrentCamera.CoordinateFrame.p)) * flySpeed +
+                    Vector3.new(math.random(-0.1, 0.1), 0.1, math.random(-0.1, 0.1))
+                lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
+            elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and flySpeed ~= 0 then
+                bv.Velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) +
+                    ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) -
+                    game.Workspace.CurrentCamera.CoordinateFrame.p)) * flySpeed +
+                    Vector3.new(math.random(-0.1, 0.1), 0.1, math.random(-0.1, 0.1))
+            else
+                bv.Velocity = Vector3.new(0, 0.1, 0)
+            end
+            bg.CFrame = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * flySpeed / maxFlySpeed), 0, 0)
+        until not flyEnabled
+        humanoid.PlatformStand = false
+        bg:Destroy()
+        bv:Destroy()
+    end)
+end
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui")
+gui.Name = "MOJOHackGui"
+gui.Parent = plr:WaitForChild("PlayerGui")
+gui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame")
+frame.Name = "Gradient"
+frame.Parent = gui
+frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+frame.Position = UDim2.new(0.02, 0, 0.78, 0)
+frame.Size = UDim2.new(0, 250, 0, 250)
+frame.Active = true
+frame.Draggable = true
+
+local uigradient = Instance.new("UIGradient")
+uigradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 69, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
+}
+uigradient.Parent = frame
+
+local uicorner = Instance.new("UICorner")
+uicorner.CornerRadius = UDim.new(0.04, 0)
+uicorner.Parent = frame
+
+-- Speed Section
+local speedTitle = Instance.new("TextLabel")
+speedTitle.Parent = frame
+speedTitle.BackgroundTransparency = 1
+speedTitle.Position = UDim2.new(0.09, 0, 0.05, 0)
+speedTitle.Size = UDim2.new(0, 200, 0, 20)
+speedTitle.Font = Enum.Font.GothamBold
+speedTitle.Text = "Speed Control"
+speedTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedTitle.TextScaled = true
+
+local speedToggle = Instance.new("TextButton")
+speedToggle.Name = "ToggleSpeed"
+speedToggle.Parent = frame
+speedToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+speedToggle.Position = UDim2.new(0.09, 0, 0.15, 0)
+speedToggle.Size = UDim2.new(0, 200, 0, 40)
+speedToggle.Font = Enum.Font.GothamSemibold
+speedToggle.Text = "Enable Speed"
+speedToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedToggle.TextScaled = true
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Parent = frame
+speedLabel.BackgroundTransparency = 1
+speedLabel.Position = UDim2.new(0.09, 0, 0.35, 0)
+speedLabel.Size = UDim2.new(0, 200, 0, 20)
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.Text = "Speed: 100"
+speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedLabel.TextScaled = true
+
+local speedInput = Instance.new("TextBox")
+speedInput.Parent = frame
+speedInput.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+speedInput.Position = UDim2.new(0.09, 0, 0.45, 0)
+speedInput.Size = UDim2.new(0, 200, 0, 30)
+speedInput.Font = Enum.Font.Gotham
+speedInput.Text = "100"
+speedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedInput.TextScaled = true
+
+-- Fly Section
+local flyTitle = Instance.new("TextLabel")
+flyTitle.Parent = frame
+flyTitle.BackgroundTransparency = 1
+flyTitle.Position = UDim2.new(0.09, 0, 0.55, 0)
+flyTitle.Size = UDim2.new(0, 200, 0, 20)
+flyTitle.Font = Enum.Font.GothamBold
+flyTitle.Text = "Flight Control"
+flyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyTitle.TextScaled = true
+
+local flyToggle = Instance.new("TextButton")
+flyToggle.Name = "ToggleFly"
+flyToggle.Parent = frame
+flyToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+flyToggle.Position = UDim2.new(0.09, 0, 0.65, 0)
+flyToggle.Size = UDim2.new(0, 200, 0, 40)
+flyToggle.Font = Enum.Font.GothamSemibold
+flyToggle.Text = "Enable Flight"
+flyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyToggle.TextScaled = true
+
+local flySpeedLabel = Instance.new("TextLabel")
+flySpeedLabel.Parent = frame
+flySpeedLabel.BackgroundTransparency = 1
+flySpeedLabel.Position = UDim2.new(0.09, 0, 0.85, 0)
+flySpeedLabel.Size = UDim2.new(0, 200, 0, 20)
+flySpeedLabel.Font = Enum.Font.Gotham
+flySpeedLabel.Text = "Fly Speed: 50"
+flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedLabel.TextScaled = true
+
+local flySpeedInput = Instance.new("TextBox")
+flySpeedInput.Parent = frame
+flySpeedInput.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+flySpeedInput.Position = UDim2.new(0.09, 0, 0.95, 0)
+flySpeedInput.Size = UDim2.new(0, 200, 0, 30)
+flySpeedInput.Font = Enum.Font.Gotham
+flySpeedInput.Text = "50"
+flySpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+flySpeedInput.TextScaled = true
+
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseGui"
+closeButton.Parent = frame
+closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeButton.Position = UDim2.new(0.85, 0, 0.05, 0)
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Font = Enum.Font.Gotham
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+closeButton.TextScaled = true
+
+-- GUI Logic
+speedToggle.MouseButton1Click:Connect(function()
+    speedEnabled = not speedEnabled
+    speedToggle.Text = speedEnabled and "Disable Speed" or "Enable Speed"
+    UpdateSpeed()
+end)
+
+speedInput.FocusLost:Connect(function()
+    local newSpeed = tonumber(speedInput.Text)
+    if newSpeed and newSpeed >= 16 and newSpeed <= maxSpeed then
+        customSpeed = newSpeed
+        speedLabel.Text = "Speed: " .. newSpeed
+        UpdateSpeed()
+    else
+        speedInput.Text = tostring(customSpeed)
+    end
+end)
+
+flyToggle.MouseButton1Click:Connect(function()
+    flyEnabled = not flyEnabled
+    flyToggle.Text = flyEnabled and "Disable Flight" or "Enable Flight"
+    if flyEnabled then
+        Fly()
+    end
+end)
+
+flySpeedInput.FocusLost:Connect(function()
+    local newFlySpeed = tonumber(flySpeedInput.Text)
+    if newFlySpeed and newFlySpeed >= 10 and newFlySpeed <= maxFlySpeed then
+        flySpeed = newFlySpeed
+        flySpeedLabel.Text = "Fly Speed: " .. newFlySpeed
+    else
+        flySpeedInput.Text = tostring(flySpeed)
+    end
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    gui.Enabled = not gui.Enabled
+end)
+
+-- Input handling
+uis.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.Q then
+        speedEnabled = not speedEnabled
+        speedToggle.Text = speedEnabled and "Disable Speed" or "Enable Speed"
+        UpdateSpeed()
+    elseif input.KeyCode == Enum.KeyCode.E then
+        flyEnabled = not flyEnabled
+        flyToggle.Text = flyEnabled and "Disable Flight" or "Enable Flight"
+        if flyEnabled then
+            Fly()
+        end
+    elseif input.KeyCode == Enum.KeyCode.LeftShift and speedEnabled then
+        speedMultiplier = 1.5
+        UpdateSpeed()
+    elseif input.KeyCode == Enum.KeyCode.W then
+        ctrl.f = 1
+    elseif input.KeyCode == Enum.KeyCode.S then
+        ctrl.b = -1
+    elseif input.KeyCode == Enum.KeyCode.A then
+        ctrl.l = -1
+    elseif input.KeyCode == Enum.KeyCode.D then
+        ctrl.r = 1
+    end
+end)
+
+uis.InputEnded:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.LeftShift then
+        speedMultiplier = 1
+        UpdateSpeed()
+    elseif input.KeyCode == Enum.KeyCode.W then
+        ctrl.f = 0
+    elseif input.KeyCode == Enum.KeyCode.S then
+        ctrl.b = 0
+    elseif input.KeyCode == Enum.KeyCode.A then
+        ctrl.l = 0
+    elseif input.KeyCode == Enum.KeyCode.D then
+        ctrl.r = 0
+    end
+end)
+
+-- Handle character respawn
+plr.CharacterAdded:Connect(function(char)
+    InitializeCharacter()
+    UpdateSpeed()
+end)
+
+-- Initial setup
+InitializeCharacter()
