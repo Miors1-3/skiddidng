@@ -1,299 +1,710 @@
-local plr = game.Players.LocalPlayer
-local uis = game:GetService("UserInputService")
-local mouse = plr:GetMouse()
-local speedEnabled = false
-local flyEnabled = false
-local baseSpeed = 16
-local customSpeed = 100
-local maxSpeed = 500
-local flySpeed = 50
-local maxFlySpeed = 200
-local speedMultiplier = 1
-local humanoid = nil
-local torso = nil
-local ctrl = {f = 0, b = 0, l = 0, r = 0}
-local lastctrl = {f = 0, b = 0, l = 0, r = 0}
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
--- Initialize character
-local function InitializeCharacter()
-    if plr.Character then
-        humanoid = plr.Character:WaitForChild("Humanoid", 10)
-        torso = plr.Character:WaitForChild("HumanoidRootPart", 10)
-        if humanoid then
-            humanoid.WalkSpeed = baseSpeed
+local player = Players.LocalPlayer
+
+-- Utils
+local function addUICorner(parent, radius)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, radius)
+    corner.Parent = parent
+    return corner
+end
+
+local function addGlowStroke(parent, color, thickness, transparency)
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = color or Color3.fromRGB(255, 50, 50)
+    stroke.Thickness = thickness or 2
+    stroke.Transparency = transparency or 0.3
+    stroke.Parent = parent
+    return stroke
+end
+
+local function addGradient(parent, color1, color2, rotation)
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)})
+    grad.Rotation = rotation or 45
+    grad.Parent = parent
+    return grad
+end
+
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DarkRedCyberGUI"
+screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.ResetOnSpawn = false
+
+-- Background Blur (Glass effect)
+local blur = Instance.new("BlurEffect")
+blur.Parent = game:GetService("Lighting")
+blur.Size = 8
+local blurEnabled = true
+
+local function toggleBlur(enabled)
+    blur.Enabled = enabled
+end
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 700, 0, 450)
+frame.Position = UDim2.new(0, 50, 0, 50)
+frame.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+frame.BorderSizePixel = 0
+frame.ClipsDescendants = true
+frame.Parent = screenGui
+addUICorner(frame, 20)
+
+-- Neon Outline Glow
+local outlineStroke = Instance.new("UIStroke")
+outlineStroke.Color = Color3.fromRGB(255, 40, 40)
+outlineStroke.Thickness = 4
+outlineStroke.Transparency = 0.4
+outlineStroke.Parent = frame
+
+-- Animate outline glow pulse
+spawn(function()
+    local info = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local goal = {Transparency = 0.1}
+    local tween = TweenService:Create(outlineStroke, info, goal)
+    tween:Play()
+end)
+
+-- Background Gradient (animated)
+local bgGradient = addGradient(frame, Color3.fromRGB(40, 0, 0), Color3.fromRGB(70, 0, 0), 60)
+local gradRot = 60
+spawn(function()
+    while true do
+        gradRot = (gradRot + 1) % 360
+        bgGradient.Rotation = gradRot
+        wait(0.03)
+    end
+end)
+
+-- Title Bar
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 55)
+titleBar.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+titleBar.BorderSizePixel = 0
+titleBar.Parent = frame
+addUICorner(titleBar, 20)
+
+-- Title Text
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Text = "🩸 Dark Red Cyber GUI"
+titleLabel.Font = Enum.Font.RobotoMono
+titleLabel.TextSize = 30
+titleLabel.TextColor3 = Color3.fromRGB(255, 60, 60)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Size = UDim2.new(1, -190, 1, 0)
+titleLabel.Position = UDim2.new(0, 20, 0, 0)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = titleBar
+
+local titleStroke = Instance.new("UIStroke")
+titleStroke.Color = Color3.fromRGB(255, 80, 80)
+titleStroke.Thickness = 1
+titleStroke.Parent = titleLabel
+
+-- Close Button
+local closeButton = Instance.new("TextButton")
+closeButton.Text = "✕"
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 36
+closeButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+closeButton.BackgroundTransparency = 1
+closeButton.Size = UDim2.new(0, 80, 1, 0)
+closeButton.Position = UDim2.new(1, -90, 0, 0)
+closeButton.Parent = titleBar
+
+local closeStroke = Instance.new("UIStroke")
+closeStroke.Color = Color3.fromRGB(255, 80, 80)
+closeStroke.Thickness = 2
+closeStroke.Parent = closeButton
+
+closeButton.MouseEnter:Connect(function()
+    closeButton.TextColor3 = Color3.fromRGB(255, 120, 120)
+end)
+closeButton.MouseLeave:Connect(function()
+    closeButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+end)
+closeButton.MouseButton1Click:Connect(function()
+    screenGui.Enabled = false
+    toggleBlur(false)
+end)
+
+-- Minimize Button
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Text = "—"
+minimizeButton.Font = Enum.Font.GothamBold
+minimizeButton.TextSize = 40
+minimizeButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+minimizeButton.BackgroundTransparency = 1
+minimizeButton.Size = UDim2.new(0, 80, 1, 0)
+minimizeButton.Position = UDim2.new(1, -170, 0, 0)
+minimizeButton.Parent = titleBar
+
+local minimizeStroke = Instance.new("UIStroke")
+minimizeStroke.Color = Color3.fromRGB(255, 80, 80)
+minimizeStroke.Thickness = 2
+minimizeStroke.Parent = minimizeButton
+
+minimizeButton.MouseEnter:Connect(function()
+    minimizeButton.TextColor3 = Color3.fromRGB(255, 120, 120)
+end)
+minimizeButton.MouseLeave:Connect(function()
+    minimizeButton.TextColor3 = Color3.fromRGB(255, 80, 80)
+end)
+
+-- Minimize functionality
+local minimized = false
+local tabBar = nil
+local tabContents = {}
+
+minimizeButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if tabBar then
+        tabBar.Visible = not minimized
+    end
+    for _, content in pairs(tabContents) do
+        content.Visible = not minimized and content.Visible or false
+    end
+    local targetSize = minimized and UDim2.new(0, 700, 0, 75) or UDim2.new(0, 700, 0, 450)
+    TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize}):Play()
+end)
+
+-- Make frame draggable
+local dragging = false
+local dragInput, dragStart, startPos
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale,
+            startPos.X.Offset + delta.X,
+            startPos.Y.Scale,
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- Tab Bar
+tabBar = Instance.new("Frame")
+tabBar.Size = UDim2.new(1, 0, 0, 65)
+tabBar.Position = UDim2.new(0, 0, 0, 55)
+tabBar.BackgroundColor3 = Color3.fromRGB(35, 0, 0)
+tabBar.BorderSizePixel = 0
+tabBar.Parent = frame
+addUICorner(tabBar, 20)
+
+-- Tabs data
+local tabNames = {"Dashboard", "Exploits", "Settings", "Player", "Visuals", "Misc"}
+local tabs = {}
+local tabCount = #tabNames
+local tabWidth = 700 / tabCount
+local neonRed = Color3.fromRGB(255, 60, 60)
+local neonDarkRed = Color3.fromRGB(180, 20, 20)
+
+-- Create tabs and content frames
+for i, name in ipairs(tabNames) do
+    local tabBtn = Instance.new("TextButton")
+    tabBtn.Text = name
+    tabBtn.Font = Enum.Font.RobotoMono
+    tabBtn.TextSize = 20
+    tabBtn.BackgroundColor
+
+
+
+
+
+
+
+ChatGPT said:
+3 = neonDarkRed
+tabBtn.Size = UDim2.new(0, tabWidth, 1, 0)
+tabBtn.Position = UDim2.new(0, tabWidth*(i-1), 0, 0)
+tabBtn.TextColor3 = neonRed
+tabBtn.BorderSizePixel = 0
+tabBtn.Parent = tabBar
+addUICorner(tabBtn, 15)
+
+pgsql
+Copy
+Edit
+local tabStroke = Instance.new("UIStroke")
+tabStroke.Color = neonRed
+tabStroke.Thickness = 2
+tabStroke.Parent = tabBtn
+
+tabs[name] = {Button = tabBtn}
+
+-- Content Frame for this tab
+local contentFrame = Instance.new("Frame")
+contentFrame.Size = UDim2.new(1, -20, 1, -120)
+contentFrame.Position = UDim2.new(0, 10, 0, 120)
+contentFrame.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+contentFrame.BorderSizePixel = 0
+contentFrame.Visible = false
+contentFrame.Parent = frame
+addUICorner(contentFrame, 15)
+
+tabs[name].Content = contentFrame
+tabContents[name] = contentFrame
+
+-- Scroll UI
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, 0, 1, 0)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.BorderSizePixel = 0
+scrollFrame.CanvasSize = UDim2.new(0, 0, 2, 0)
+scrollFrame.ScrollBarThickness = 6
+scrollFrame.Parent = contentFrame
+
+tabs[name].ScrollFrame = scrollFrame
+end
+
+-- Activate the first tab by default
+local function selectTab(name)
+for tName, tData in pairs(tabs) do
+local active = (tName == name)
+tData.Content.Visible = active
+if active then
+tData.Button.BackgroundColor3 = neonRed
+tData.Button.TextColor3 = Color3.new(1,1,1)
+else
+tData.Button.BackgroundColor3 = neonDarkRed
+tData.Button.TextColor3 = neonRed
+end
+end
+end
+selectTab("Dashboard")
+
+for name, data in pairs(tabs) do
+data.Button.MouseButton1Click:Connect(function()
+selectTab(name)
+end)
+end
+
+-- Modules ---
+
+-- 1) Teleport Module (Dashboard tab)
+do
+local dashContent = tabs["Dashboard"].ScrollFrame
+
+pgsql
+Copy
+Edit
+local teleportLabel = Instance.new("TextLabel")
+teleportLabel.Text = "Teleport to Player:"
+teleportLabel.Font = Enum.Font.RobotoMono
+teleportLabel.TextSize = 22
+teleportLabel.TextColor3 = neonRed
+teleportLabel.BackgroundTransparency = 1
+teleportLabel.Position = UDim2.new(0, 10, 0, 10)
+teleportLabel.Size = UDim2.new(0, 300, 0, 35)
+teleportLabel.Parent = dashContent
+
+local teleportBox = Instance.new("TextBox")
+teleportBox.PlaceholderText = "Enter player name"
+teleportBox.Font = Enum.Font.RobotoMono
+teleportBox.TextSize = 22
+teleportBox.TextColor3 = Color3.new(1,1,1)
+teleportBox.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+teleportBox.Size = UDim2.new(0, 280, 0, 40)
+teleportBox.Position = UDim2.new(0, 10, 0, 55)
+teleportBox.ClearTextOnFocus = false
+teleportBox.Parent = dashContent
+addUICorner(teleportBox, 8)
+addGlowStroke(teleportBox, neonRed, 1, 0.4)
+
+local tpButton = Instance.new("TextButton")
+tpButton.Text = "Teleport"
+tpButton.Font = Enum.Font.RobotoMono
+tpButton.TextSize = 22
+tpButton.TextColor3 = neonRed
+tpButton.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+tpButton.Size = UDim2.new(0, 120, 0, 40)
+tpButton.Position = UDim2.new(0, 300, 0, 55)
+tpButton.Parent = dashContent
+addUICorner(tpButton, 8)
+addGlowStroke(tpButton, neonRed, 1.5, 0.3)
+
+tpButton.MouseEnter:Connect(function()
+    tpButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+end)
+tpButton.MouseLeave:Connect(function()
+    tpButton.TextColor3 = neonRed
+end)
+
+tpButton.MouseButton1Click:Connect(function()
+    local targetName = teleportBox.Text
+    if #targetName < 3 then
+        teleportBox.Text = ""
+        teleportBox.PlaceholderText = "Enter valid name"
+        return
+    end
+    local targetPlayer = Players:FindFirstChild(targetName) or Players:GetPlayers()[table.find(table.map(Players:GetPlayers(), function(p) return p.Name end), targetName)]
+    -- More robust: case insensitive and partial match:
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr.Name:lower():find(targetName:lower()) then
+            targetPlayer = plr
+            break
         end
+    end
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+    else
+        teleportBox.Text = ""
+        teleportBox.PlaceholderText = "Player not found or no HRP"
+    end
+end)
+end
+
+-- 2) Fullbright Toggle (Visuals tab)
+do
+local visualsContent = tabs["Visuals"].ScrollFrame
+
+pgsql
+Copy
+Edit
+local fullbrightLabel = Instance.new("TextLabel")
+fullbrightLabel.Text = "Fullbright:"
+fullbrightLabel.Font = Enum.Font.RobotoMono
+fullbrightLabel.TextSize = 22
+fullbrightLabel.TextColor3 = neonRed
+fullbrightLabel.BackgroundTransparency = 1
+fullbrightLabel.Position = UDim2.new(0, 10, 0, 10)
+fullbrightLabel.Size = UDim2.new(0, 150, 0, 35)
+fullbrightLabel.Parent = visualsContent
+
+local fullbrightToggle = Instance.new("TextButton")
+fullbrightToggle.Text = "OFF"
+fullbrightToggle.Font = Enum.Font.RobotoMono
+fullbrightToggle.TextSize = 22
+fullbrightToggle.TextColor3 = Color3.fromRGB(255, 80, 80)
+fullbrightToggle.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+fullbrightToggle.Size = UDim2.new(0, 100, 0, 40)
+fullbrightToggle.Position = UDim2.new(0, 160, 0, 10)
+fullbrightToggle.Parent = visualsContent
+addUICorner(fullbrightToggle, 8)
+addGlowStroke(fullbrightToggle, neonRed, 1.5, 0.4)
+
+local originalLighting = {
+    Brightness = game.Lighting.Brightness,
+    Ambient = game.Lighting.Ambient,
+    OutdoorAmbient = game.Lighting.OutdoorAmbient,
+    ClockTime = game.Lighting.ClockTime,
+    FogEnd = game.Lighting.FogEnd,
+    FogColor = game.Lighting.FogColor,
+    GlobalShadows = game.Lighting.GlobalShadows
+}
+
+local fullbrightEnabled = false
+
+local function setFullbright(enabled)
+    fullbrightEnabled = enabled
+    if enabled then
+        game.Lighting.Brightness = 2
+        game.Lighting.Ambient = Color3.new(1,1,1)
+        game.Lighting.OutdoorAmbient = Color3.new(1,1,1)
+        game.Lighting.ClockTime = 14
+        game.Lighting.FogEnd = 100000
+        game.Lighting.GlobalShadows = false
+        fullbrightToggle.Text = "ON"
+        fullbrightToggle.TextColor3 = Color3.fromRGB(150, 255, 150)
+    else
+        for k,v in pairs(originalLighting) do
+            game.Lighting[k] = v
+        end
+        fullbrightToggle.Text = "OFF"
+        fullbrightToggle.TextColor3 = Color3.fromRGB(255, 80, 80)
     end
 end
 
--- Update ground speed
-local function UpdateSpeed()
-    if humanoid and speedEnabled then
-        local targetSpeed = math.clamp(customSpeed * speedMultiplier, 16, maxSpeed)
-        for i = humanoid.WalkSpeed, targetSpeed, (targetSpeed > humanoid.WalkSpeed and 1 or -1) do
-            humanoid.WalkSpeed = i
-            wait(0.05)
-        end
-    elseif humanoid then
-        humanoid.WalkSpeed = baseSpeed
-    end
+fullbrightToggle.MouseButton1Click:Connect(function()
+    setFullbright(not fullbrightEnabled)
+end)
 end
 
--- Fly logic
-local function Fly()
-    if not torso or not humanoid then return end
-    local bg = Instance.new("BodyGyro", torso)
-    bg.P = 9e4
-    bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bg.CFrame = torso.CFrame
-    local bv = Instance.new("BodyVelocity", torso)
-    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bv.Velocity = Vector3.new(0, 0.1, 0)
+-- 3) Fly Module (Player tab)
+do
+local playerContent = tabs["Player"].ScrollFrame
 
-    spawn(function()
-        repeat wait()
-            if not flyEnabled then break end
-            humanoid.PlatformStand = true
-            if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
-                flySpeed = flySpeed + 0.5 + (flySpeed / maxFlySpeed)
-                if flySpeed > maxFlySpeed then
-                    flySpeed = maxFlySpeed
-                end
-            elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and flySpeed > 0 then
-                flySpeed = flySpeed - 1
-                if flySpeed < 0 then
-                    flySpeed = 0
-                end
-            end
-            if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
-                bv.Velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) +
-                    ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) -
-                    game.Workspace.CurrentCamera.CoordinateFrame.p)) * flySpeed +
-                    Vector3.new(math.random(-0.1, 0.1), 0.1, math.random(-0.1, 0.1))
-                lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
-            elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and flySpeed ~= 0 then
-                bv.Velocity = ((game.Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) +
-                    ((game.Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) -
-                    game.Workspace.CurrentCamera.CoordinateFrame.p)) * flySpeed +
-                    Vector3.new(math.random(-0.1, 0.1), 0.1, math.random(-0.1, 0.1))
-            else
-                bv.Velocity = Vector3.new(0, 0.1, 0)
-            end
-            bg.CFrame = game.Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * flySpeed / maxFlySpeed), 0, 0)
-        until not flyEnabled
-        humanoid.PlatformStand = false
-        bg:Destroy()
-        bv:Destroy()
+pgsql
+Copy
+Edit
+local flyLabel = Instance.new("TextLabel")
+flyLabel.Text = "Fly:"
+flyLabel.Font = Enum.Font.RobotoMono
+flyLabel.TextSize = 22
+flyLabel.TextColor3 = neonRed
+flyLabel.BackgroundTransparency = 1
+flyLabel.Position = UDim2.new(0, 10, 0, 10)
+flyLabel.Size = UDim2.new(0, 100, 0, 35)
+flyLabel.Parent = playerContent
+
+local flyToggle = Instance.new("TextButton")
+flyToggle.Text = "OFF"
+flyToggle.Font = Enum.Font.RobotoMono
+flyToggle.TextSize = 22
+flyToggle.TextColor3 = Color3.fromRGB(255, 80, 80)
+flyToggle.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+flyToggle.Size = UDim2.new(0, 100, 0, 40)
+flyToggle.Position = UDim2.new(0, 110, 0, 10)
+flyToggle.Parent = playerContent
+addUICorner(flyToggle, 8)
+addGlowStroke(flyToggle, neonRed, 1.5, 0.4)
+
+local flySpeedSliderLabel = Instance.new("TextLabel")
+flySpeedSliderLabel.Text = "Fly Speed:"
+flySpeedSliderLabel.Font = Enum.Font.RobotoMono
+flySpeedSliderLabel.TextSize = 18
+flySpeedSliderLabel.TextColor3 = neonRed
+flySpeedSliderLabel.BackgroundTransparency = 1
+flySpeedSliderLabel.Position = UDim2.new(0, 10, 0, 60)
+flySpeedSliderLabel.Size = UDim2.new(0, 100, 0, 25)
+flySpeedSliderLabel.Parent = playerContent
+
+local flySpeedSlider = Instance.new("TextBox")
+flySpeedSlider.Text = "100"
+flySpeedSlider.Font = Enum.Font.RobotoMono
+flySpeedSlider.TextSize = 18
+flySpeedSlider.TextColor3 = Color3.new(1,1,1)
+flySpeedSlider.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+flySpeedSlider.Size = UDim2.new(0, 80, 0, 30)
+flySpeedSlider.Position = UDim2.new(0, 110, 0, 60)
+flySpeedSlider.ClearTextOnFocus = false
+flySpeedSlider.Parent = playerContent
+addUICorner(flySpeedSlider, 6)
+addGlowStroke(flySpeedSlider, neonRed, 1, 0.4)
+
+local flying = false
+local flySpeed = 100
+
+local flyConnection
+
+local function startFly()
+    local character = player.Character
+    if not character then return end
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoidRootPart or not humanoid then return end
+
+    flying = true
+    humanoid.PlatformStand = true
+
+    local velocity = Instance.new("BodyVelocity")
+    velocity.Name = "FlyVelocity"
+    velocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    velocity.Velocity = Vector3.new(0, 0, 0)
+    velocity.Parent = humanoidRootPart
+
+    local gyro = Instance.new("BodyGyro")
+    gyro.Name = "FlyGyro"
+    gyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    gyro.CFrame = humanoidRootPart.CFrame
+    gyro.Parent = humanoidRootPart
+
+    flyConnection = RunService.RenderStepped:Connect(function()
+        local moveDir = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + Workspace.CurrentCamera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - Workspace.CurrentCamera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - Workspace.CurrentCamera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + Workspace.CurrentCamera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+
+        moveDir = moveDir.Unit * flySpeed
+        if moveDir ~= moveDir then -- NaN check if no keys pressed
+            moveDir = Vector3.new(0, 0, 0)
+        end
+
+        velocity.Velocity = moveDir
+        gyro.CFrame = Workspace.CurrentCamera.CFrame
     end)
 end
 
--- GUI Setup
-local gui = Instance.new("ScreenGui")
-gui.Name = "MOJOHackGui"
-gui.Parent = plr:WaitForChild("PlayerGui")
-gui.ResetOnSpawn = false
+local function stopFly()
+    flying = false
+    local character = player.Character
+    if not character then return end
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoidRootPart or not humanoid then return end
 
-local frame = Instance.new("Frame")
-frame.Name = "Gradient"
-frame.Parent = gui
-frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-frame.Position = UDim2.new(0.02, 0, 0.78, 0)
-frame.Size = UDim2.new(0, 250, 0, 250)
-frame.Active = true
-frame.Draggable = true
-
-local uigradient = Instance.new("UIGradient")
-uigradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 69, 0)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(139, 0, 0))
-}
-uigradient.Parent = frame
-
-local uicorner = Instance.new("UICorner")
-uicorner.CornerRadius = UDim.new(0.04, 0)
-uicorner.Parent = frame
-
--- Speed Section
-local speedTitle = Instance.new("TextLabel")
-speedTitle.Parent = frame
-speedTitle.BackgroundTransparency = 1
-speedTitle.Position = UDim2.new(0.09, 0, 0.05, 0)
-speedTitle.Size = UDim2.new(0, 200, 0, 20)
-speedTitle.Font = Enum.Font.GothamBold
-speedTitle.Text = "Speed Control"
-speedTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedTitle.TextScaled = true
-
-local speedToggle = Instance.new("TextButton")
-speedToggle.Name = "ToggleSpeed"
-speedToggle.Parent = frame
-speedToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-speedToggle.Position = UDim2.new(0.09, 0, 0.15, 0)
-speedToggle.Size = UDim2.new(0, 200, 0, 40)
-speedToggle.Font = Enum.Font.GothamSemibold
-speedToggle.Text = "Enable Speed"
-speedToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedToggle.TextScaled = true
-
-local speedLabel = Instance.new("TextLabel")
-speedLabel.Parent = frame
-speedLabel.BackgroundTransparency = 1
-speedLabel.Position = UDim2.new(0.09, 0, 0.35, 0)
-speedLabel.Size = UDim2.new(0, 200, 0, 20)
-speedLabel.Font = Enum.Font.Gotham
-speedLabel.Text = "Speed: 100"
-speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedLabel.TextScaled = true
-
-local speedInput = Instance.new("TextBox")
-speedInput.Parent = frame
-speedInput.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-speedInput.Position = UDim2.new(0.09, 0, 0.45, 0)
-speedInput.Size = UDim2.new(0, 200, 0, 30)
-speedInput.Font = Enum.Font.Gotham
-speedInput.Text = "100"
-speedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedInput.TextScaled = true
-
--- Fly Section
-local flyTitle = Instance.new("TextLabel")
-flyTitle.Parent = frame
-flyTitle.BackgroundTransparency = 1
-flyTitle.Position = UDim2.new(0.09, 0, 0.55, 0)
-flyTitle.Size = UDim2.new(0, 200, 0, 20)
-flyTitle.Font = Enum.Font.GothamBold
-flyTitle.Text = "Flight Control"
-flyTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyTitle.TextScaled = true
-
-local flyToggle = Instance.new("TextButton")
-flyToggle.Name = "ToggleFly"
-flyToggle.Parent = frame
-flyToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-flyToggle.Position = UDim2.new(0.09, 0, 0.65, 0)
-flyToggle.Size = UDim2.new(0, 200, 0, 40)
-flyToggle.Font = Enum.Font.GothamSemibold
-flyToggle.Text = "Enable Flight"
-flyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
-flyToggle.TextScaled = true
-
-local flySpeedLabel = Instance.new("TextLabel")
-flySpeedLabel.Parent = frame
-flySpeedLabel.BackgroundTransparency = 1
-flySpeedLabel.Position = UDim2.new(0.09, 0, 0.85, 0)
-flySpeedLabel.Size = UDim2.new(0, 200, 0, 20)
-flySpeedLabel.Font = Enum.Font.Gotham
-flySpeedLabel.Text = "Fly Speed: 50"
-flySpeedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-flySpeedLabel.TextScaled = true
-
-local flySpeedInput = Instance.new("TextBox")
-flySpeedInput.Parent = frame
-flySpeedInput.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-flySpeedInput.Position = UDim2.new(0.09, 0, 0.95, 0)
-flySpeedInput.Size = UDim2.new(0, 200, 0, 30)
-flySpeedInput.Font = Enum.Font.Gotham
-flySpeedInput.Text = "50"
-flySpeedInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-flySpeedInput.TextScaled = true
-
-local closeButton = Instance.new("TextButton")
-closeButton.Name = "CloseGui"
-closeButton.Parent = frame
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-closeButton.Position = UDim2.new(0.85, 0, 0.05, 0)
-closeButton.Size = UDim2.new(0, 30, 0, 30)
-closeButton.Font = Enum.Font.Gotham
-closeButton.Text = "X"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextScaled = true
-
--- GUI Logic
-speedToggle.MouseButton1Click:Connect(function()
-    speedEnabled = not speedEnabled
-    speedToggle.Text = speedEnabled and "Disable Speed" or "Enable Speed"
-    UpdateSpeed()
-end)
-
-speedInput.FocusLost:Connect(function()
-    local newSpeed = tonumber(speedInput.Text)
-    if newSpeed and newSpeed >= 16 and newSpeed <= maxSpeed then
-        customSpeed = newSpeed
-        speedLabel.Text = "Speed: " .. newSpeed
-        UpdateSpeed()
-    else
-        speedInput.Text = tostring(customSpeed)
+    humanoid.PlatformStand = false
+    local velocity = humanoidRootPart:FindFirstChild("FlyVelocity")
+    if velocity then velocity:Destroy() end
+    local gyro = humanoidRootPart:FindFirstChild("FlyGyro")
+    if gyro then gyro:Destroy() end
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
     end
-end)
+end
 
 flyToggle.MouseButton1Click:Connect(function()
-    flyEnabled = not flyEnabled
-    flyToggle.Text = flyEnabled and "Disable Flight" or "Enable Flight"
-    if flyEnabled then
-        Fly()
-    end
-end)
-
-flySpeedInput.FocusLost:Connect(function()
-    local newFlySpeed = tonumber(flySpeedInput.Text)
-    if newFlySpeed and newFlySpeed >= 10 and newFlySpeed <= maxFlySpeed then
-        flySpeed = newFlySpeed
-        flySpeedLabel.Text = "Fly Speed: " .. newFlySpeed
+    if flying then
+        stopFly()
+        flyToggle.Text = "OFF"
+        flyToggle.TextColor3 = Color3.fromRGB(255, 80, 80)
     else
-        flySpeedInput.Text = tostring(flySpeed)
-    end
-end)
-
-closeButton.MouseButton1Click:Connect(function()
-    gui.Enabled = not gui.Enabled
-end)
-
--- Input handling
-uis.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.Q then
-        speedEnabled = not speedEnabled
-        speedToggle.Text = speedEnabled and "Disable Speed" or "Enable Speed"
-        UpdateSpeed()
-    elseif input.KeyCode == Enum.KeyCode.E then
-        flyEnabled = not flyEnabled
-        flyToggle.Text = flyEnabled and "Disable Flight" or "Enable Flight"
-        if flyEnabled then
-            Fly()
+        local num = tonumber(flySpeedSlider.Text)
+        if num and num > 0 and num <= 1000 then
+            flySpeed = num
+        else
+            flySpeedSlider.Text = tostring(flySpeed)
         end
-    elseif input.KeyCode == Enum.KeyCode.LeftShift and speedEnabled then
-        speedMultiplier = 1.5
-        UpdateSpeed()
-    elseif input.KeyCode == Enum.KeyCode.W then
-        ctrl.f = 1
-    elseif input.KeyCode == Enum.KeyCode.S then
-        ctrl.b = -1
-    elseif input.KeyCode == Enum.KeyCode.A then
-        ctrl.l = -1
-    elseif input.KeyCode == Enum.KeyCode.D then
-        ctrl.r = 1
+        startFly()
+        flyToggle.Text = "ON"
+        flyToggle.TextColor3 = Color3.fromRGB(150, 255, 150)
     end
 end)
 
-uis.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.LeftShift then
-        speedMultiplier = 1
-        UpdateSpeed()
-    elseif input.KeyCode == Enum.KeyCode.W then
-        ctrl.f = 0
-    elseif input.KeyCode == Enum.KeyCode.S then
-        ctrl.b = 0
-    elseif input.KeyCode == Enum.KeyCode.A then
-        ctrl.l = 0
-    elseif input.KeyCode == Enum.KeyCode.D then
-        ctrl.r = 0
+flySpeedSlider.FocusLost:Connect(function(enterPressed)
+    local num = tonumber(flySpeedSlider.Text)
+    if num and num > 0 and num <= 1000 then
+        flySpeed = num
+    else
+        flySpeedSlider.Text = tostring(flySpeed)
+    end
+end)
+end
+
+-- 4) Speed Module (Player tab)
+do
+local playerContent = tabs["Player"].ScrollFrame
+
+pgsql
+Copy
+Edit
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Text = "Walk Speed:"
+speedLabel.Font = Enum.Font.RobotoMono
+speedLabel.TextSize = 22
+speedLabel.TextColor3 = neonRed
+speedLabel.BackgroundTransparency = 1
+speedLabel.Position = UDim2.new(0, 10, 0, 110)
+speedLabel.Size = UDim2.new(0, 120, 0, 35)
+speedLabel.Parent = playerContent
+
+local speedSlider = Instance.new("TextBox")
+speedSlider.Text = "20"
+speedSlider.Font = Enum.Font.RobotoMono
+speedSlider.TextSize = 22
+speedSlider.TextColor3 = Color3.new(1,1,1)
+speedSlider.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+speedSlider.Size = UDim2.new(0, 80, 0, 40)
+speedSlider.Position = UDim2.new(0, 140, 0, 110)
+speedSlider.ClearTextOnFocus = false
+speedSlider.Parent = playerContent
+addUICorner(speedSlider, 8)
+addGlowStroke(speedSlider, neonRed, 1, 0.4)
+
+local speedButton = Instance.new("TextButton")
+speedButton.Text = "Set Speed"
+speedButton.Font = Enum.Font.RobotoMono
+speedButton.TextSize = 22
+speedButton.TextColor3 = neonRed
+speedButton.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+speedButton.Size = UDim2.new(0, 120, 0, 40)
+speedButton.Position = UDim2.new(0, 230, 0, 110)
+speedButton.Parent = playerContent
+addUICorner(speedButton, 8)
+addGlowStroke(speedButton, neonRed, 1.5, 0.3)
+
+speedButton.MouseEnter:Connect(function()
+    speedButton.TextColor3 = Color3.fromRGB(255, 100, 100)
+end)
+speedButton.MouseLeave:Connect(function()
+    speedButton.TextColor3 = neonRed
+end)
+
+speedButton.MouseButton1Click:Connect(function()
+    local num = tonumber(speedSlider.Text)
+    if num and num >= 16 and num <= 250 then
+        local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.WalkSpeed = num
+        end
+    else
+        speedSlider.Text = "20"
     end
 end)
 
--- Handle character respawn
-plr.CharacterAdded:Connect(function(char)
-    InitializeCharacter()
-    UpdateSpeed()
+speedSlider.FocusLost:Connect(function(enterPressed)
+    local num = tonumber(speedSlider.Text)
+    if not (num and num >= 16 and num <= 250) then
+        speedSlider.Text = "20"
+    end
 end)
+end
+
+-- Enable blur on start
+toggleBlur(true)
+
+yaml
+Copy
+Edit
+
+---
+
+### What this script includes:
+- A dark red cyber-themed GUI with glowing outline and animated gradient background.
+- Tabs: Dashboard, Player, Visuals with clickable switching.
+- Teleport to player input and button on Dashboard tab.
+- Fullbright toggle in Visuals tab.
+- Fly toggle with speed input on Player tab.
+- Walk speed input and set button on Player tab.
+- Utility functions for UI corners, glow, and blur effect.
+- Careful input validation for speed and fly speed.
+
+If you want me to explain or modify any part, just say!
+
+
+
+
+
+
+
+
+
+
+Search
 
 -- Initial setup
 InitializeCharacter()
